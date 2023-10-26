@@ -11,15 +11,20 @@ import androidx.appcompat.app.AppCompatActivity
 import com.bumptech.glide.Glide
 import com.gy25m.expicture.databinding.ActivityMainBinding
 import android.graphics.Bitmap
-
+import android.net.Uri
+import android.os.Environment
+import androidx.core.content.FileProvider
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 
 class MainActivity : AppCompatActivity() {
    val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
 
-
-    // 1. ActivityResultLauncher 인스턴스 선언
     private lateinit var imageCaptureLauncher: ActivityResultLauncher<Intent>
+    private var imageUri: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,20 +33,35 @@ class MainActivity : AppCompatActivity() {
         binding.btn.setOnClickListener {
             takePicture()
         }
-        // 2. registerForActivityResult 사용하여 초기화
+
         imageCaptureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == Activity.RESULT_OK) {
-                val imageBitmap = result.data?.extras?.get("data") as Bitmap
-                Glide.with(this).load(imageBitmap).into(binding.iv)
+                imageUri?.let {
+                    Glide.with(this).load(it).into(binding.iv)
+                }
             }
         }
     }
 
     private fun takePicture() {
         val pictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+
         pictureIntent.resolveActivity(packageManager)?.also {
-            // 3. launch 메서드를 사용하여 액티비티 시작
+            val imageFile: File = createImageFile()
+            imageUri = FileProvider.getUriForFile(
+                this,
+                "com.gy25m.expicture",  // AndroidManifest.xml에서 지정한 FileProvider의 authorities와 동일해야 함.
+                imageFile
+            )
+
+            pictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri)
             imageCaptureLauncher.launch(pictureIntent)
         }
+    }
+
+    private fun createImageFile(): File {
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+        val storageDir: File? = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        return File.createTempFile("JPEG_${timeStamp}_", ".jpg", storageDir)
     }
 }
